@@ -32,6 +32,10 @@ def reset_inventory():
     _next_id = max(i["id"] for i in inventory) + 1
 
 
+EDITABLE_FIELDS = {"product_name", "brands", "ingredients_text",
+                   "barcode", "price", "stock"}
+
+
 def _find(item_id):
     return next((i for i in inventory if i["id"] == item_id), None)
 
@@ -42,6 +46,9 @@ def _validate(data, partial=False):
         return "Request body must be a JSON object"
     if not partial and not data.get("product_name"):
         return "'product_name' is required"
+    if "product_name" in data and (not isinstance(data["product_name"], str)
+                                   or not data["product_name"].strip()):
+        return "'product_name' must be a non-empty string"
     if "price" in data and (not isinstance(data["price"], (int, float))
                             or isinstance(data["price"], bool) or data["price"] < 0):
         return "'price' must be a non-negative number"
@@ -100,8 +107,12 @@ def create_app():
         error = _validate(data, partial=True)
         if error:
             return jsonify(error=error), 400
-        data.pop("id", None)  # ids are immutable
-        item.update({k: v for k, v in data.items() if k in item})
+        if not data:
+            return jsonify(error="No fields to update"), 400
+        unknown = sorted(set(data) - EDITABLE_FIELDS)
+        if unknown:  # also rejects 'id', which is immutable
+            return jsonify(error=f"Cannot update field(s): {', '.join(unknown)}"), 400
+        item.update(data)
         return jsonify(item), 200
 
     @app.delete("/inventory/<int:item_id>")
