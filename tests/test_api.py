@@ -47,7 +47,29 @@ def test_patch_updates_price_and_stock(client):
 
 
 def test_patch_cannot_change_id(client):
-    assert client.patch("/inventory/1", json={"id": 50}).get_json()["id"] == 1
+    r = client.patch("/inventory/1", json={"id": 50})
+    assert r.status_code == 400
+    assert client.get("/inventory/1").get_json()["id"] == 1
+
+
+def test_patch_rejects_empty_body(client):
+    r = client.patch("/inventory/1", json={})
+    assert r.status_code == 400 and "No fields" in r.get_json()["error"]
+
+
+def test_patch_rejects_unknown_field(client):
+    r = client.patch("/inventory/1", json={"colour": "red"})
+    assert r.status_code == 400 and "colour" in r.get_json()["error"]
+
+
+def test_patch_rejects_blank_or_non_string_name(client):
+    assert client.patch("/inventory/1", json={"product_name": "  "}).status_code == 400
+    assert client.patch("/inventory/1", json={"product_name": 5}).status_code == 400
+
+
+def test_patch_can_rename(client):
+    r = client.patch("/inventory/1", json={"product_name": "Oat Milk"})
+    assert r.status_code == 200 and r.get_json()["product_name"] == "Oat Milk"
 
 
 def test_patch_missing_and_invalid(client):
